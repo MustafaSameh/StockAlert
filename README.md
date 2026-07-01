@@ -119,7 +119,7 @@ Column names are flexible — you enter the exact names from your own dataset.
 
 **Mustafa Ismail ** — self-taught developer focused on data analysis and automation tools.
 
-[GitHub](https://github.com/MustafaSameh) · [LinkedIn](https://www.linkedin.com/in/mustafa-sameh-429267377/)
+[GitHub](https://github.com/MustafaSameh) · [LinkedIn](https://www.linkedin.com/in/mustafa-ismail-429267377/)
 
 ---
 
