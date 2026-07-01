@@ -54,7 +54,7 @@ ipywidgets
 
 **Installation**
 ```bash
-git clone https://github.com/YourUsername/StockAlert.git
+git clone https://github.com/MustafaSameh/StockAlert.git
 cd StockAlert
 pip install pandas numpy ipywidgets
 ```
