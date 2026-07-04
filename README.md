@@ -22,6 +22,9 @@ StockAlert prevents this by analyzing historical sales data and telling the busi
 - **Flexible stock monitoring** — reads current inventory from your dataset or accepts manual input
 - **Date-aware** — uses the most recent inventory reading when multiple records exist
 - **Case-insensitive column matching** — works with `Units Sold`, `units sold`, or `UNITS SOLD`
+- **Order quantity calculator** — two-way: give days, get units. Or give units, get days.
+- **Background scheduler** — daily stock monitoring + automatic ROP recalculation every 90 days
+- **Manual ROP calculator** — enter your own numbers without needing a dataset
 
 ---
 
@@ -50,13 +53,14 @@ Python 3.8+
 pandas
 numpy
 ipywidgets
+apscheduler
 ```
 
 **Installation**
 ```bash
 git clone https://github.com/MustafaSameh/StockAlert.git
 cd StockAlert
-pip install pandas numpy ipywidgets
+pip install pandas numpy ipywidgets sqlalchemy pymysql apscheduler
 ```
 
 **Run**
@@ -109,7 +113,7 @@ Column names are flexible — you enter the exact names from your own dataset.
 - [x] Statistical ROP calculation with Z-score safety stock
 - [x] Stock level monitoring with reorder alerts
 - [ ] Direct database connectivity (SQLAlchemy)
-- [ ] Automated scheduling — daily stock checks, quarterly ROP recalculation
+- [x] Automated scheduling — daily stock checks, quarterly ROP recalculation
 - [ ] Web interface (FastAPI + React)
 - [ ] Seasonal demand adjustment using ML
 
