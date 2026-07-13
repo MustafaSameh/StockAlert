@@ -54,13 +54,16 @@ pandas
 numpy
 ipywidgets
 apscheduler
+sqlalchemy
+datetime
+io
 ```
 
 **Installation**
 ```bash
 git clone https://github.com/MustafaSameh/StockAlert.git
 cd StockAlert
-pip install pandas numpy ipywidgets sqlalchemy pymysql apscheduler
+pip install pandas numpy ipywidgets sqlalchemy pymysql apscheduler dotenv
 ```
 
 **Run**
@@ -112,7 +115,7 @@ Column names are flexible — you enter the exact names from your own dataset.
 - [x] Automated data cleaning (duplicates, nulls, outliers)
 - [x] Statistical ROP calculation with Z-score safety stock
 - [x] Stock level monitoring with reorder alerts
-- [ ] Direct database connectivity (SQLAlchemy)
+- [x] Direct database connectivity (SQLAlchemy)
 - [x] Automated scheduling — daily stock checks, quarterly ROP recalculation
 - [ ] Web interface (FastAPI + React)
 - [ ] Seasonal demand adjustment using ML
