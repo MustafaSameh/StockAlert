@@ -169,15 +169,15 @@ def sql_connection(dataconfig):
     targeted_sales = pd.read_sql(query, engine)
     return targeted_sales
 
-def data_sentizer(targeted_sales, sales_column):
+def data_sanitizer(targeted_sales, sales_column):
     
-    def duplicates_sentizer(targeted_sales):
+    def duplicates_sanitizer(targeted_sales):
         if targeted_sales.duplicated().sum() != 0:  
            # FIX: Changed 'df' to 'targeted_sales' to resolve NameError namespace issue
            targeted_sales = targeted_sales.drop_duplicates().copy()
         return targeted_sales
     
-    def outliers_sentizer(ts_df):
+    def outliers_sanitizer(ts_df):
         q1 = pd.Series(sorted(ts_df[sales_column])).quantile(0.25)
         q3 = pd.Series(sorted(ts_df[sales_column])).quantile(0.75)
         IQR = q3 - q1
@@ -187,14 +187,14 @@ def data_sentizer(targeted_sales, sales_column):
         ts_df.loc[:, sales_column] = ts_df[sales_column].clip(lower_fence, upper_fence)
         return ts_df
     
-    def nulls_sentizer(targeted_sales):   
+    def nulls_sanitizer(targeted_sales):   
         if targeted_sales[sales_column].isna().sum() != 0: 
             targeted_sales.loc[:, sales_column] = targeted_sales[sales_column].fillna(targeted_sales[sales_column].mean())       
         return targeted_sales
 
-    targeted_sales = duplicates_sentizer(targeted_sales)
-    targeted_sales = nulls_sentizer(targeted_sales)
-    targeted_sales = outliers_sentizer(targeted_sales)
+    targeted_sales = duplicates_sanitizer(targeted_sales)
+    targeted_sales = nulls_sanitizer(targeted_sales)
+    targeted_sales = outliers_sanitizer(targeted_sales)
     return targeted_sales
 
 
@@ -214,25 +214,25 @@ class StockAlert:
 
 
     def clean(self):
-    # no need to pass targeted_sales — it's already stored in self
-        self.targeted_sales = data_sentizer(
-        self.targeted_sales, 
-        self.sales_column
+        # no need to pass targeted_sales — it's already stored in self
+        self.targeted_sales = data_sanitizer(
+            self.targeted_sales, 
+            self.sales_column
     )
 
-        def calculate_rop(self):
-            avg   = self.targeted_sales[self.sales_column].mean()
-            std   = self.targeted_sales[self.sales_column].std()
+    def calculate_rop(self):
+        avg   = self.targeted_sales[self.sales_column].mean()
+        std   = self.targeted_sales[self.sales_column].std()
 
 # Handle single row edge-case scenario where std evaluates to NaN
-            if pd.isna(std):
-                std = 0.0
-                safety_stock = 1.65 * std * np.sqrt(self.lead_time)        
-                self.rop = (avg * self.lead_time) + safety_stock
-                self.avg_sales = avg
-                self.std_dev = std
+        if pd.isna(std):
+            std = 0.0
+            safety_stock = 1.65 * std * np.sqrt(self.lead_time)        
+            self.rop = (avg * self.lead_time) + safety_stock
+            self.avg_sales = avg
+            self.std_dev = std
 
-            return self.rop , self.avg_sales , self.std_dev
+        return self.rop , self.avg_sales , self.std_dev
 
     def order_quantity(self):
         print("\nWould you like to calculate your order quantity?")
@@ -288,7 +288,6 @@ class StockAlert:
         if self.inventory_column is None:
                 print("  ℹ️  No inventory column configured — skipping automated check")
                 return
-        current_stock = latest_row[self.inventory_column]
         try:
             date_col  = find_date_column(self.targeted_sales)
             latest_row = (
@@ -360,7 +359,7 @@ def main():
         alert.calculate_rop()
         alert.order_quantity()
         alert.check_stock()
-        alert.recalculate_rop()
+        alert.start_scheduler(review_period)
         
 
     else:

@@ -1,5 +1,5 @@
 # 📦 StockAlert
-
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](your-app-url-here)
 **Automated Inventory Reorder Point Calculator**
 
 StockAlert is a Python tool that analyzes sales data and automatically calculates the optimal reorder point for inventory items — helping retail stores, pharmacies, and restaurants avoid stockouts and over-ordering.
@@ -25,9 +25,21 @@ StockAlert prevents this by analyzing historical sales data and telling the busi
 - **Order quantity calculator** — two-way: give days, get units. Or give units, get days.
 - **Background scheduler** — daily stock monitoring + automatic ROP recalculation every 90 days
 - **Manual ROP calculator** — enter your own numbers without needing a dataset
+- **Web interface** — interactive Streamlit app with dual-mode: 
+  upload CSV or connect directly to a SQL database
+- **OOP architecture** — core logic wrapped in a clean `StockAlert` class
 
 ---
+## 📁 Program Structure
 
+```
+StockAlert/
+├── app.py              ← Streamlit web interface
+├── StockAlert.py       ← core pipeline logic
+├── StockAlert.ipynb    ← original notebook (documentation)
+├── requirements.txt    ← dependencies
+└── data/
+    └── sales_data_sample.csv
 ## 📊 How It Works
 
 ```
@@ -52,11 +64,11 @@ Where Z = 1.65 (95% service level), σ = standard deviation of sales.
 Python 3.8+
 pandas
 numpy
-ipywidgets
 apscheduler
 sqlalchemy
-datetime
-io
+pymysql  
+streamlit 
+openpyxl
 ```
 
 **Installation**
@@ -67,7 +79,16 @@ pip install pandas numpy ipywidgets sqlalchemy pymysql apscheduler dotenv
 ```
 
 **Run**
+**Run the web app**
+```bash
+streamlit run app.py
+```
 
+**Or run the terminal version**
+```bash
+python StockAlert.py
+```
+**For Old Versions**
 Open `StockAlert.ipynb` in Jupyter and run `main()`.
 
 The program will guide you through:
@@ -117,8 +138,9 @@ Column names are flexible — you enter the exact names from your own dataset.
 - [x] Stock level monitoring with reorder alerts
 - [x] Direct database connectivity (SQLAlchemy)
 - [x] Automated scheduling — daily stock checks, quarterly ROP recalculation
-- [ ] Web interface (FastAPI + React)
+- [x] Web interface (Streamlit)
 - [ ] Seasonal demand adjustment using ML
+- [ ] Web interface (FastAPI + React)
 
 ---
 

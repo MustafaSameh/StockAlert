@@ -1,0 +1,9 @@
+pandas==3.0.5
+numpy==2.5.1
+sqlalchemy==2.0.51
+streamlit==1.60.0
+apscheduler==3.11.3
+pymysql
+psycopg2-binary
+openpyxl
+ipywidgets==8.1.8
