@@ -3,8 +3,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import create_engine, inspect
 from datetime import datetime
 from pathlib import Path
-import tkinter as tk
 from   tkinter import filedialog
+from prophet import Prophet
+import tkinter as tk
 import pandas as pd
 import numpy as np
 
@@ -197,7 +198,6 @@ def data_sanitizer(targeted_sales, sales_column):
     targeted_sales = outliers_sanitizer(targeted_sales)
     return targeted_sales
 
-
 class StockAlert:
     def __init__(self,targeted_sales,sales_column,lead_time, restock_days = 0 , inventory_column = None):
         # __init__ runs automatically when you create the object
@@ -219,6 +219,22 @@ class StockAlert:
             self.targeted_sales, 
             self.sales_column
     )
+
+    def seasons_forcasting(self , holidays = None , holiday_dates = None , lower_window = 0 , upper_window = 0):
+    # prepare the data for Prophet
+        df = self.targeted_sales.copy()
+        df = df.rename(columns = { find_date_column(df): 'ds' , self.sales_column: 'y'})
+
+    # forcasting sales in New Year's Day , New Year's Eve , Christmas Day
+        holiday = pd.DataFrame({
+            "holiday" : holidays,
+            "ds" : pd.to_datetime(holiday_dates),
+        "lower_window" : lower_window,
+        "upper_window" : upper_window,
+        })
+        m = Prophet(holidays = holiday)
+        forcast = m.fit(df).predict(df)
+        return forcast
 
     def calculate_rop(self):
         avg   = self.targeted_sales[self.sales_column].mean()

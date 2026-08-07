@@ -7,3 +7,4 @@ pymysql
 psycopg2-binary
 openpyxl
 ipywidgets==8.1.8
+prophet 

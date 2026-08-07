@@ -3,6 +3,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import create_engine, inspect
 from datetime import datetime
 from pathlib import Path
+from prophet import Prophet
 import pandas as pd
 import numpy as np
 import streamlit as st 
@@ -11,29 +12,34 @@ import streamlit as st
 # Backend #
 #-----------------------
 
+# Manual ROP Calculator Function (If you know your numbers quite well, you can just enter them and get the ROP)
 def manual_rop_calculator(  current_stock: int  
                           , avg_sales:float 
                           , std_dev_sales: float 
                           , lead_time: int):
 
-    # FIX: Removed trailing comma that accidentally cast safety_stock into a tuple
+    
+    # Calculate the Reorder Point (ROP) using the formula:
     safety_stock = 1.65 * std_dev_sales * np.sqrt(lead_time)
     rop = (avg_sales * lead_time) + safety_stock
-    
+
+    # Check if the current stock is below or above the ROP
     if current_stock <= rop:
         return (f"⚠️  REORDER ALERT \nCurrent stock: {current_stock} units\nReorder point : {rop:.1f} units\n→ Place a new order now")
     else:
         buffer = current_stock - rop
         return f"✅ Stock is OK\nCurrent stock: {current_stock} units\nReorder point: {rop:.1f} units\n→ {buffer:.1f} units above reorder point"
 
-
+# Find the needed column in the dataframe based on user input, ignoring case and underscores
 def find_column(df, user_input):
-    # ENHANCEMENT: Also handles underscores (.replace('_', ' ')) so typing 'inventory_level' matches 'Inventory Level'
+
+    # Normalize both the dataframe columns and user input for comparison
     matched = [col for col in df.columns if col.lower().replace('_', ' ').strip() == user_input.lower().replace('_', ' ').strip()]
     if matched:
         return matched[0]   # returns the real column name as it exists in the df
     raise ValueError(f"Column '{user_input}' not found. Available: {list(df.columns)}")
 
+# Find date column in the dataframe based on most common date-related column names, ignoring case and underscores
 def find_date_column(df):
     synonyms = ['date', 'datetime', 'timestamp', 'time', 'day', 'period']
     for col in df.columns:
@@ -42,16 +48,9 @@ def find_date_column(df):
             return col
     return None
 
-
-
-        
-        
- #targeted_sales = data.loc[data[product_column] == "product_name"].copy()
-    
-
-
+# SQL connection function that fethches the targeted sales data based on the product name and product column provided by the user    
 def sql_connection(db_type: str, Host: str, Port: str, Username: str, Password: str, Database_name: str, sales_table: str, product_column: str, product_name: str):
-    
+    # Define the database drivers for different database types
     drivers = {
         "mysql":      "mysql+pymysql",
         "postgresql": "postgresql+psycopg2",
@@ -78,14 +77,19 @@ def sql_connection(db_type: str, Host: str, Port: str, Username: str, Password: 
     targeted_sales = pd.read_sql(query, engine)
     return targeted_sales
 
+# Data Sanitizer is our Dettol for the dataset. It cleans duplicates, nulls, and outliers in the sales data. 
 def data_sanitizer(targeted_sales, sales_column):
     
+    # Nested functions to handle duplicates, outliers, and nulls in the dataset
+
+    # Drop duplicates if any exist
     def duplicates_sanitizer(targeted_sales):
         if targeted_sales.duplicated().sum() != 0:  
            # FIX: Changed 'df' to 'targeted_sales' to resolve NameError namespace issue
            targeted_sales = targeted_sales.drop_duplicates().copy()
         return targeted_sales
     
+    # Handle outliers using the IQR method
     def outliers_sanitizer(ts_df):
         q1 = pd.Series(sorted(ts_df[sales_column])).quantile(0.25)
         q3 = pd.Series(sorted(ts_df[sales_column])).quantile(0.75)
@@ -96,6 +100,7 @@ def data_sanitizer(targeted_sales, sales_column):
         ts_df.loc[:, sales_column] = ts_df[sales_column].clip(lower_fence, upper_fence)
         return ts_df
     
+    # Hnandle null values by filling them with the mean of the sales column that we got after handling outliers
     def nulls_sanitizer(targeted_sales):   
         if targeted_sales[sales_column].isna().sum() != 0: 
             targeted_sales.loc[:, sales_column] = targeted_sales[sales_column].fillna(targeted_sales[sales_column].mean())       
@@ -106,8 +111,9 @@ def data_sanitizer(targeted_sales, sales_column):
     targeted_sales = outliers_sanitizer(targeted_sales)
     return targeted_sales
 
-
+# StockAlert class encapsulates the logic for calculating ROP, checking stock levels, and scheduling automated checks.
 class StockAlert:
+    # Initialize the class with the required parameters
     def __init__(self,targeted_sales,sales_column,lead_time, restock_days = 0 , inventory_column = None):
         # __init__ runs automatically when you create the object
         # it just stores the shared data so you don't pass it everywhere
@@ -120,15 +126,12 @@ class StockAlert:
         self.avg_sales          = None
         self.std_dev            = None
     
-
-
     def clean(self):
         # no need to pass targeted_sales — it's already stored in self
         self.targeted_sales = data_sanitizer(
             self.targeted_sales, 
             self.sales_column
     )
-
     def calculate_rop(self):
         avg = self.targeted_sales[self.sales_column].mean()
         std = self.targeted_sales[self.sales_column].std()
@@ -140,7 +143,7 @@ class StockAlert:
         self.rop = (avg * self.lead_time) + safety_stock
         self.avg_sales = avg
         self.std_dev = std
-
+        
         return self.rop, self.avg_sales, self.std_dev
 
     def calculate_days_of_stock(self, order_quantity: int) -> str:
@@ -194,7 +197,6 @@ class StockAlert:
         except Exception as e:
             print(f"  ❌ Recalculation failed: {e}")
 
-
     def start_scheduler(self, review_period):
         review_weeks = max(1, review_period // 7)
         scheduler    = BackgroundScheduler()
@@ -218,11 +220,12 @@ class StockAlert:
 # Frontend #
 #-----------------------        
 def main ():
+   
     st.set_page_config(page_title="StockAlert ROP Calculator", layout="wide")
     st.title("📦 StockAlert Inventory Manager")
 
     # 1. Top Level Choice (Maps to your first flowchart box)
-    tab_manual, tab_auto = st.tabs(["🧮 Manual ROP Calculator", "🤖 Automatic Calculation"])
+    tab_manual, tab_auto, tab_order , tab_forcasting = st.tabs(["🧮 Manual ROP", "🤖 Automatic Calculation", "📦 Order Quantity Planner", "📊 Seasonal Forecasting"])
 
     # ==========================================
     # TAB 1: MANUAL CALCULATOR
@@ -260,20 +263,25 @@ def main ():
             
             if uploaded_file is not None:
                 # Display the dataframe as you designed in the wireframe
-                df = pd.read_csv(uploaded_file)
+                df = pd.read_csv(uploaded_file) 
                 st.dataframe(df.head()) 
-                
                 st.write("### Please fill these fields:")
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    product_name = st.text_input("Product Name:")
+                    product_name = st.text_input("Product Name:") 
+                    
+                    
                     review_period = st.number_input("Review Period (Days):", value=90)
                 with col_b:
                     sales_column = st.text_input("Sales Column Name (e.g., Units Sold):")
+                    
                     product_column = st.text_input("Product Column Name:")
                     lead_time_auto = st.number_input("Lead Time:", min_value=0)
-                
-                # Sub-branch for stock level choice
+
+                st.session_state['saved_sales_col'] = sales_column
+                st.session_state['saved_leadtime'] = lead_time_auto
+                st.session_state['saved_product_name'] = product_name
+                # Sub-branch for stock level choice 
                 stock_choice = st.radio("How to check current stock?", ["Manual Stock Level", "From Column"])
                 if stock_choice == "Manual Stock Level":
                     manual_stock = st.number_input("Enter current stock:")
@@ -283,11 +291,8 @@ def main ():
                 if st.button("Run Automatic Analysis"):
                     # TODO: Initialize StockAlert class and run logic here!
                     targeted = df[df[product_column] == product_name].copy()
-                    alert = StockAlert(
-                        targeted_sales=targeted, 
-                        sales_column= sales_column, 
-                        lead_time=lead_time_auto
-                    )
+                    alert = StockAlert(targeted_sales=targeted, sales_column=sales_column, lead_time=lead_time_auto)
+                    st.session_state['my_saved_df'] = targeted
                     alert.clean()
                     calculated_rop, calculated_avg, calculated_std = alert.calculate_rop()
                     if stock_choice == "Manual Stock Level":
@@ -329,8 +334,12 @@ def main ():
 
             if st.button("Connect & Analyze"):
                 try:
-                    df = sql_connection(...)
+                    df = sql_connection(db_type, db_host, db_port, db_user, db_pass, db_name, sales_table, product_column, product_name)
                     targeted = df[df[product_column] == product_name].copy()
+                    st.session_state['my_saved_df'] = targeted
+                    st.session_state['saved_product_name'] = product_name
+                    st.session_state['saved_leadtime'] = lead_time_db 
+                    st.session_state['saved_sales_col'] = sales_column
                     alert = StockAlert(targeted_sales=targeted, sales_column=sales_column, lead_time=lead_time_db)
                     alert.clean()
                     calculated_rop, calculated_avg, calculated_std = alert.calculate_rop()
@@ -345,5 +354,129 @@ def main ():
                     st.info(result_text)
                 except Exception as e:
                     st.error(f"Error: {e}")
-main()    
+    # ==========================================
+    # TAB 3: ORDER QUANTITY PLANNER
+    # ==========================================
+    with tab_order:
+        st.header("Order Quantity Planning")
+        st.write("Plan your next purchase based on your calculated ROP and Average Sales.")
 
+        # Ask the user for the variables needed for the math
+        col_x, col_y = st.columns(2)
+        with col_x:
+            known_rop = st.number_input("Enter your calculated ROP:", min_value=0.0)
+        with col_y:
+            known_avg_sales = st.number_input("Enter your Average Daily Sales:", min_value=0.0)
+
+        st.divider() # Adds a nice horizontal line for visual separation
+
+        # Replaces your terminal choice input ("1 for yes, 2 for no")
+        calc_choice = st.radio(
+            "What would you like to calculate?", 
+            ["Days of Stock (I know the quantity I want to buy)", "Order Quantity (I know how many days I want to cover)"]
+        )
+
+        # Choice 1 Logic
+        if calc_choice == "Days of Stock (I know the quantity I want to buy)":
+            qty = st.number_input("Enter the desired order quantity (units):", min_value=0, step=1)
+            
+            if st.button("Calculate Days"):
+                if known_avg_sales > 0:
+                    days = (qty - known_rop) / known_avg_sales
+                    st.success(f"📦 {qty} units will last approximately **{days:.1f} days**.")
+                else:
+                    st.warning("Average sales must be greater than 0 to calculate days.")
+                    
+        # Choice 2 Logic
+        else:
+            days = st.number_input("Enter the desired stock duration (days):", min_value=0, step=1)
+            
+            if st.button("Calculate Quantity"):
+                qty = known_rop + (known_avg_sales * days)
+                st.success(f"🛒 Recommended order quantity for {days} days: **{qty:.1f} units**.")
+
+    # ==========================================
+    # TAB 4: SEASONAL FORECASTING
+    # ==========================================
+    with tab_forcasting:
+        st.header("Seasonal Forecasting")
+        st.write("Forecast future sales using Prophet with holiday effects.")
+        
+        # 1. The User UI: Let the user select their custom date range
+        st.write("Select the specific period you want to calculate ROP for:")
+        col_start, col_end = st.columns(2)
+        with col_start:
+            start_date = st.date_input("Start Date")
+            country = st.text_input("Enter the country code for holidays (e.g., 'EG' for Egypt, 'US' for USA):")
+        with col_end:
+            end_date = st.date_input("End Date")
+
+        if st.button("Calculate Seasonal ROP"):
+            # 3. The Filter: Slice the forecast dataframe to match the user's dates
+            
+            if 'my_saved_df' in st.session_state and 'saved_sales_col' in st.session_state and 'saved_leadtime' in st.session_state and 'saved_product_name' in st.session_state:
+                # Retrieve data without asking the user again for inputs.
+                forecast_df = st.session_state['my_saved_df']
+                sales_col = st.session_state['saved_sales_col']
+                lead_time = st.session_state['saved_leadtime']
+                product_name = st.session_state['saved_product_name']
+                st.success("Successfully loaded your data from the previous tab!")
+
+                m = Prophet() 
+                m.add_country_holidays(country_name=country) # 'EG' for Egypt, 'US' for USA, 'DE' for Germany, etc.
+                prophet_df = forecast_df.rename(columns={find_date_column(forecast_df): 'ds', sales_col: 'y'})
+                m.fit(prophet_df)
+                future = m.make_future_dataframe(periods=1825)  
+                forecast = m.predict(future)
+
+                mask = (forecast['ds'] >= pd.to_datetime(start_date)) & (forecast['ds'] <= pd.to_datetime(end_date))
+                specific_period_data = forecast.loc[mask]
+
+                if not specific_period_data.empty:
+                    # 4. The Math: Apply your ROP equation to just those dates!
+                    seasonal_alert = StockAlert(
+                            targeted_sales=specific_period_data,
+                            sales_column='yhat',
+                            lead_time=lead_time
+                        )
+                        
+                        # Now call the exact same function. It works perfectly!
+                    seasonal_rop, seasonal_avg, seasonal_std = seasonal_alert.calculate_rop()
+                        
+                        # Display the final results beautifully
+                    st.divider()
+    
+                    # 3. Display the Trend Line Chart
+                    st.write("### 📈 Forecasted Sales Trend")
+                    # Format dataframe for Streamlit chart index
+                    chart_data = (
+                        specific_period_data[['ds', 'yhat']]
+                        .rename(columns={'ds': 'Date', 'yhat': 'Forecasted Sales'})
+                        .set_index('Date')
+                    )
+                    st.line_chart(chart_data)
+    
+                    # 4. Display the Filtered DataFrame Table
+                    st.write(f"### 📋 Daily Forecast Breakdown for {product_name} from {start_date} to {end_date} ")
+                    st.dataframe(
+                        specific_period_data[['ds', 'yhat']]
+                        .rename(columns={'ds': 'Date', 'yhat': 'Forecasted Sales'})
+                        .reset_index(drop=True),
+                        use_container_width=True
+                    )
+    
+                    st.subheader("🎯 Projected Seasonal ROP")
+                    st.write(f"**Recommended Reorder Point:** {seasonal_rop:.1f} units")
+                    st.write(f"*(Forecasted Avg Daily Sales: {seasonal_avg:.1f} | Forecasted Std Dev: {seasonal_std:.1f})*")
+                    
+                else:
+                    st.warning("No forecast data available for the selected dates. Try a different range.")
+                
+            else:
+                st.warning("Please go to the Auto tab and upload your data first.")
+
+                                
+        else:
+            st.warning("Please go to the Auto tab and run the Automatic Analysis first so we can load your data.")
+                                    
+main()

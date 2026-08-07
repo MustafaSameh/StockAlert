@@ -69,6 +69,7 @@ sqlalchemy
 pymysql  
 streamlit 
 openpyxl
+prophet
 ```
 
 **Installation**
