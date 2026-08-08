@@ -1,5 +1,5 @@
 # 📦 StockAlert
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](your-app-url-here)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://stockalert1.streamlit.app/)
 **Automated Inventory Reorder Point Calculator**
 
 StockAlert is a Python tool that analyzes sales data and automatically calculates the optimal reorder point for inventory items — helping retail stores, pharmacies, and restaurants avoid stockouts and over-ordering.
@@ -28,16 +28,22 @@ StockAlert prevents this by analyzing historical sales data and telling the busi
 - **Web interface** — interactive Streamlit app with dual-mode: 
   upload CSV or connect directly to a SQL database
 - **OOP architecture** — core logic wrapped in a clean `StockAlert` class
+- **Bulk ROP dashboard** — calculates ROP for all products at once with ✅/⚠️ status
+- **Seasonal demand forecasting** — Prophet ML model with country holiday support
+- **Lead time configuration** — per-product CSV, by category, or single default
 
 ---
 ## 📁 Program Structure
 
 ```
 StockAlert/
-├── app.py              ← Streamlit web interface
-├── StockAlert.py       ← core pipeline logic
-├── StockAlert.ipynb    ← original notebook (documentation)
-├── requirements.txt    ← dependencies
+├── app.py                  ← Streamlit web interface
+├── StockAlert.py           ← terminal version (legacy)
+├── StockAlert.ipynb        ← original notebook (documentation)
+├── requirements.txt        ← dependencies
+├── src/
+│   ├── stock_alert.py      ← StockAlert class
+│   └── data_utils.py       ← helper functions (find_column, data_sanitizer, sql_connection...)
 └── data/
     └── sales_data_sample.csv
 ## 📊 How It Works
@@ -140,7 +146,8 @@ Column names are flexible — you enter the exact names from your own dataset.
 - [x] Direct database connectivity (SQLAlchemy)
 - [x] Automated scheduling — daily stock checks, quarterly ROP recalculation
 - [x] Web interface (Streamlit)
-- [ ] Seasonal demand adjustment using ML
+- [x] Seasonal demand adjustment using ML
+- [x] METHODOLOGY.md (mathematical documentation)
 - [ ] Web interface (FastAPI + React)
 
 ---
