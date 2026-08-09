@@ -58,7 +58,6 @@ class StockAlert:
             date_col = find_date_column(product_df)
             latest   = product_df.sort_values(date_col).iloc[-1] if date_col else product_df.iloc[-1]
             current_stock = latest[self.inventory_column]
-            current_lead_time = product_df['Lead_Time'].iloc[0] if 'Lead_Time' in product_df.columns else self.lead_time
             status = "⚠️ REORDER" if current_stock <= rop else "✅ OK"
             
             results.append({

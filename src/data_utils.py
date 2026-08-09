@@ -83,6 +83,7 @@ def data_sanitizer(targeted_sales, sales_column):
     
     # Handle outliers using the IQR method
     def outliers_sanitizer(ts_df):
+        col_data = pd.to_numeric(ts_df[sales_column], errors='coerce')
         q1 = pd.Series(sorted(ts_df[sales_column])).quantile(0.25)
         q3 = pd.Series(sorted(ts_df[sales_column])).quantile(0.75)
         IQR = q3 - q1

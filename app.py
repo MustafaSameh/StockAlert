@@ -252,30 +252,35 @@ def handle_bulk_products():
                     inventory_column=stock_column,
                     lead_time=None # We handle lead time dynamically inside the class now
                 )
-                
-                # FIXED: Actually calling the class method!
-                results_df = alert.calculate_all_rops()
+                st.session_state['bulk_alert'] = alert
+                st.session_state['bulk_results_df'] = alert.calculate_all_rops()
                 alert.start_scheduler(review_period)
+            if 'bulk_results_df' in st.session_state:
+                results_df = st.session_state['bulk_results_df']
+                
                 st.write("### 3. Bulk Results")
                 st.success("Backend automated analysis will appear here.")
                 st.success(f"Scheduler activated: ROP will recalculate every {max(1, review_period // 7)} weeks.")
 
                 filter_option = st.radio("Show:", ["All Products", "Needs Reorder Only", "OK Only"], horizontal=True)
                 if filter_option == "Needs Reorder Only":
-                    display_df = results_df[results_df["Status"] == "⚠️ REORDER"]
+                    display_df = results_df[results_df["Status"].astype(str).str.contains("REORDER", case=False, na=False)]
                 elif filter_option == "OK Only":
-                    display_df = results_df[results_df["Status"] == "✅ OK"]
+                    display_df = results_df[results_df["Status"].astype(str).str.contains("OK", case=False, na=False)]
                 else:
                     display_df = results_df
-                st.session_state['bulk_alert'] = alert
+                st.dataframe(display_df, use_container_width=True)
+
+                reorder_count = len(results_df[results_df["Status"].astype(str).str.contains("REORDER", case=False, na=False)])
+                st.metric("Products Needing Urgent Reorder", reorder_count)
+
+                
                 if st.button("🔄 Refresh Bulk Stock Status"):
                     if 'bulk_alert' in st.session_state:
                         st.session_state['bulk_alert'].clean()
-                        updated_results = st.session_state['bulk_alert'].calculate_all_rops()
-                        st.dataframe(updated_results, use_container_width=True)
+                        st.session_state['bulk_results_df'] = st.session_state['bulk_alert'].calculate_all_rops()
                         st.success("Stock status recalculated successfully!")
-                    else:
-                        st.warning("No data found to refresh. Please run an analysis first.")
+                        st.rerun()
     elif data_source == "Connect to Database":
         st.subheader("Connect to Database for Bulk Analysis")
         
