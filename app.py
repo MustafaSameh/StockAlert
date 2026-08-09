@@ -439,56 +439,72 @@ def render_forecast_tab():
     with col_end:
         end_date = st.date_input("End Date")
 
-    if st.button("Calculate Seasonal ROP"):
-        # 1. Check if we have data saved in session state first
-        if 'my_saved_df' not in st.session_state or 'saved_sales_col' not in st.session_state:
-            st.warning("Please go to the Automatic Calculation tab and run an analysis first to load data.")
-            return # Stop rendering the rest of the tab until data exists
+    # 1. Guard check BEFORE the button
+    if 'my_saved_df' not in st.session_state or 'saved_sales_col' not in st.session_state:
+        st.warning("Please go to the Automatic Calculation tab and run an analysis first to load data.")
+        return
 
-        forecast_df = st.session_state['my_saved_df'].copy()
-        
-        # 2. If data came from Bulk Analysis, let the user pick a product
-        if st.session_state.get('is_bulk'):
-            prod_col = st.session_state['saved_product_col']
-            selected_product = st.selectbox("Select a product to forecast:", forecast_df[prod_col].unique())
-            
-            # Filter the dataframe to just that product
-            forecast_df = forecast_df[forecast_df[prod_col] == selected_product]
-            
-            # Extract that specific product's lead time from the column
-            current_lead_time = forecast_df['Lead_Time'].iloc[0] if 'Lead_Time' in forecast_df.columns else 3
-        else:
-            # If it came from Single Product analysis
-            selected_product = st.session_state.get('saved_product_name', 'Product')
-            current_lead_time = st.session_state.get('saved_leadtime', 3)
-        st.divider()
-        m = Prophet() 
-        if country: m.add_country_holidays(country_name=country)
-        
-        prophet_df = forecast_df.rename(columns={find_date_column(forecast_df): 'ds', st.session_state['saved_sales_col']: 'y'})
-        m.fit(prophet_df)
-        
-        forecast = m.predict(m.make_future_dataframe(periods=365))
-        mask = (forecast['ds'] >= pd.to_datetime(start_date)) & (forecast['ds'] <= pd.to_datetime(end_date))
-        specific_period_data = forecast.loc[mask]
+    forecast_df = st.session_state['my_saved_df'].copy()
 
-        if not specific_period_data.empty:
-            seasonal_alert = StockAlert(targeted_sales=specific_period_data, sales_column='yhat', lead_time=current_lead_time)
-            seasonal_rop, seasonal_avg, seasonal_std = seasonal_alert.calculate_rop()
-            
-            st.divider()
-            st.write("### 📈 Forecasted Sales Trend")
-            chart_data = specific_period_data[['ds', 'yhat']].rename(columns={'ds': 'Date', 'yhat': 'Forecasted Sales'}).set_index('Date')
-            st.line_chart(chart_data)
+    # 2. Product Selector OUTSIDE the button (so you pick the product FIRST)
+    if st.session_state.get('is_bulk'):
+        prod_col = st.session_state['saved_product_col']
+        product_list = forecast_df[prod_col].dropna().unique()
+        selected_product = st.selectbox("Select a product to forecast:", product_list)
 
-            st.subheader("🎯 Projected Seasonal ROP")
-            st.write(f"**Recommended Reorder Point:** {seasonal_rop:.1f} units")
-            st.write(f"*(Forecasted Avg Daily Sales: {seasonal_avg:.1f} | Forecasted Std Dev: {seasonal_std:.1f})*")
-        else:
-            st.warning("No forecast data available for the selected dates.")
+        # Filter for the selected product
+        forecast_df = forecast_df[forecast_df[prod_col] == selected_product]
+        current_lead_time = forecast_df['Lead_Time'].iloc[0] if 'Lead_Time' in forecast_df.columns else 3
     else:
-        st.warning("Please go to the Automatic Calculation tab and run single product analysis first to save data.")
+        selected_product = st.session_state.get('saved_product_name', 'Product')
+        current_lead_time = st.session_state.get('saved_leadtime', 3)
+        st.info(f"Forecasting for single product: **{selected_product}**")
 
+    st.divider()
+
+    # 3. Forecast calculation runs ONLY when button is clicked
+    if st.button("Calculate Seasonal ROP"):
+        with st.spinner(f"Running Prophet forecast for {selected_product}..."):
+            m = Prophet() 
+            if country.strip(): 
+                m.add_country_holidays(country_name=country.strip())
+            
+            date_col = find_date_column(forecast_df)
+            sales_col = st.session_state['saved_sales_col']
+            
+            # 1. Standardize dates and target ranges
+            prophet_df = forecast_df.rename(columns={date_col: 'ds', sales_col: 'y'})
+            prophet_df['ds'] = pd.to_datetime(prophet_df['ds'])
+            
+            max_hist_date = prophet_df['ds'].max()
+            target_end_date = pd.to_datetime(end_date)
+            
+            # 2. Dynamically calculate days needed to reach end_date
+            days_needed = (target_end_date - max_hist_date).days
+            periods = max(365, days_needed + 30)  # Always cover up to target_end_date
+            
+            # 3. Fit and Predict
+            m.fit(prophet_df)
+            future = m.make_future_dataframe(periods=periods)
+            forecast = m.predict(future)
+            
+            mask = (forecast['ds'] >= pd.to_datetime(start_date)) & (forecast['ds'] <= pd.to_datetime(end_date))
+            specific_period_data = forecast.loc[mask]
+
+            if not specific_period_data.empty:
+                seasonal_alert = StockAlert(targeted_sales=specific_period_data, sales_column='yhat', lead_time=current_lead_time)
+                seasonal_rop, seasonal_avg, seasonal_std = seasonal_alert.calculate_rop()
+                
+                st.divider()
+                st.write(f"### 📈 Forecasted Sales Trend — {selected_product}")
+                chart_data = specific_period_data[['ds', 'yhat']].rename(columns={'ds': 'Date', 'yhat': 'Forecasted Sales'}).set_index('Date')
+                st.line_chart(chart_data)
+
+                st.subheader("🎯 Projected Seasonal ROP")
+                st.write(f"**Recommended Reorder Point:** {seasonal_rop:.1f} units")
+                st.write(f"*(Forecasted Avg Daily Sales: {seasonal_avg:.1f} | Forecasted Std Dev: {seasonal_std:.1f})*")
+            else:
+                st.warning("No forecast data available for the selected dates.")
 # ==========================================
 # 🚀 MAIN APP EXECUTION
 # ==========================================
