@@ -89,13 +89,13 @@ def data_sanitizer(targeted_sales, sales_column):
         upper_fence = q3 + 1.5 * IQR
         lower_fence = max(0, q1 - 1.5 * IQR)
         # FIX: Working safely and directly on the scoped variable mapping
-        ts_df.loc[:, sales_column] = ts_df[sales_column].clip(lower_fence, upper_fence)
+        ts_df[sales_column] = ts_df[sales_column].clip(lower_fence, upper_fence)
         return ts_df
     
     # Hnandle null values by filling them with the mean of the sales column that we got after handling outliers
     def nulls_sanitizer(targeted_sales):   
         if targeted_sales[sales_column].isna().sum() != 0: 
-            targeted_sales.loc[:, sales_column] = targeted_sales[sales_column].fillna(targeted_sales[sales_column].mean())       
+            targeted_sales[sales_column] = targeted_sales[sales_column].fillna(targeted_sales[sales_column].mean())       
         return targeted_sales
 
     targeted_sales = duplicates_sanitizer(targeted_sales)

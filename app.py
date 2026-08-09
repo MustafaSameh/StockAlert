@@ -62,12 +62,9 @@ def handle_single_product():
             col_a, col_b = st.columns(2)
             with col_a:
                 product_name = st.text_input("Product Name:") 
-                
-                
                 review_period = st.number_input("Review Period (Days):", value=90)
             with col_b:
                 sales_column = st.text_input("Sales Column Name (e.g., Units Sold):")
-                
                 product_column = st.text_input("Product Column Name:")
                 lead_time_auto = st.number_input("Lead Time:", min_value=0)
 
@@ -183,16 +180,12 @@ def handle_bulk_products():
             col_a, col_b = st.columns(2)
             with col_a:
                 review_period = st.number_input("Review Period (Days):", value=90)
-            with col_b:
                 sales_column = st.text_input("Sales Column Name (e.g., Units Sold):")
                 product_column = st.text_input("Product Column Name:")
+            with col_b:
                 category_column = st.selectbox("Category Column (Optional):", ["None"] + list(df.columns))
-                
-
-
+                stock_column = st.text_input("Enter stock column name:")
  
-            stock_column = st.text_input("Enter stock column name:")
-
             st.divider()
             st.subheader("Lead Time Configuration")
             
@@ -213,7 +206,6 @@ def handle_bulk_products():
                 st.write("Set lead times for your main categories below:")
                 categories = df[category_column].dropna().unique()
                 lead_times = {}
-                
                 cols = st.columns(3)
                 for index, cat in enumerate(categories):
                     with cols[index % 3]:
@@ -274,7 +266,7 @@ def handle_bulk_products():
                 elif filter_option == "OK Only":
                     display_df = results_df[results_df["Status"] == "✅ OK"]
                 else:
-                    display_df = display_df = results_df
+                    display_df = results_df
                 st.session_state['bulk_alert'] = alert
                 if st.button("🔄 Refresh Bulk Stock Status"):
                     if 'bulk_alert' in st.session_state:
@@ -311,10 +303,6 @@ def handle_bulk_products():
             inventory_column = st.text_input("Inventory Column Name (for current stock):")
             category_column = st.text_input("Category Column (Optional - leave blank if none):")
             
-        lt_method = st.radio(
-            "How would you like to set lead times?",
-            ["Use one default for all products"] # Limited for DB until queried
-        )
         st.divider()
         st.subheader("2. Lead Time Configuration")
         
@@ -346,16 +334,19 @@ def handle_bulk_products():
                 
                 lt_dict = dict(zip(lt_df[lt_prod_col], lt_df[lt_days_col]))
 
-        st.session_state['my_saved_df'] = df
-        st.session_state['saved_sales_col'] = sales_column
-        st.session_state['saved_product_col'] = product_column
-        st.session_state['is_bulk'] = True
+
 
         if st.button("Connect & Run Bulk Analysis"):
+
             try:
                 # Fetch the entire table by passing an empty string for product_name
                 df = sql_connection(db_type, db_host, db_port, db_user, db_pass, db_name, sales_table, product_column, "")
-                
+
+                st.session_state['my_saved_df'] = df
+                st.session_state['saved_sales_col'] = sales_column
+                st.session_state['saved_product_col'] = product_column
+                st.session_state['is_bulk'] = True 
+
                 # Apply the correct lead time logic based on the user's choice
                 if lt_method == "Use one default for all products":
                     df['Lead_Time'] = default_lt
