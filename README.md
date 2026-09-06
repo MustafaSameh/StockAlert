@@ -162,4 +162,6 @@ Column names are flexible — you enter the exact names from your own dataset.
 
 ## 📄 License
 
-MIT License — free to use and modify.
+© 2025 Mustafa Ismail. All rights reserved.  
+This project is publicly viewable for portfolio and educational 
+purposes. Commercial use requires written permission.
